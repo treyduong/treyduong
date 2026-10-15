@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Bản đồ Chi nhánh</title>
+  <meta name="description" content="Bản đồ mạng lưới chi nhánh và phòng giao dịch trên toàn quốc">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%231434a4' d='M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.css">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="icon-btn only-mobile" id="btnToggleSidebar" aria-label="Mở danh sách" title="Danh sách">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="brand">
+      <img id="brandLogo" alt="" hidden>
+      <div>
+        <h1 id="brandName">Bản đồ Chi nhánh</h1>
+        <p id="brandTagline"></p>
+      </div>
+    </div>
+    <div class="stats" id="stats" aria-live="polite"></div>
+  </header>
+
+  <div id="sampleBanner" class="banner" hidden>
+    Đang hiển thị <b>dữ liệu mẫu</b>. Thay nội dung <code>data/branches.csv</code> (hoặc trỏ <code>config.js</code> tới Google Sheets) để dùng dữ liệu thật.
+    <button class="banner-close" aria-label="Đóng">×</button>
+  </div>
+
+  <main class="layout">
+    <aside class="sidebar" id="sidebar">
+      <!-- Danh sách -->
+      <section class="panel" id="listPanel">
+        <div class="filters">
+          <div class="search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="q" type="search" placeholder="Tìm tên, địa chỉ, tỉnh (cũ/mới)…" autocomplete="off">
+          </div>
+          <div class="chips" id="regionChips" role="group" aria-label="Lọc theo miền"></div>
+          <div class="row">
+            <select id="selProvince" aria-label="Tỉnh/thành"><option value="">Tất cả 34 tỉnh/thành</option></select>
+            <select id="selType" aria-label="Loại điểm"><option value="">Tất cả loại</option></select>
+          </div>
+          <div class="row">
+            <button class="btn ghost" id="btnNear">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+              Gần tôi
+            </button>
+            <button class="btn ghost" id="btnReset">Xóa lọc</button>
+          </div>
+        </div>
+        <div class="tabs" role="tablist">
+          <button role="tab" class="tab active" data-view="branches">Điểm giao dịch</button>
+          <button role="tab" class="tab" data-view="provinces">Theo tỉnh/thành</button>
+        </div>
+        <div class="result-meta" id="resultMeta"></div>
+        <ul class="list" id="list"></ul>
+        <ul class="list" id="provList" hidden></ul>
+        <footer class="side-foot" id="sideFoot"></footer>
+      </section>
+
+      <!-- Chi tiết -->
+      <section class="panel detail" id="detailPanel" hidden>
+        <button class="back" id="btnBack">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg> Danh sách
+        </button>
+        <div id="detail"></div>
+      </section>
+    </aside>
+
+    <div class="map-wrap">
+      <div id="map" role="application" aria-label="Bản đồ chi nhánh"></div>
+
+      <div class="map-tools">
+        <button class="tool" id="btnHome" title="Toàn quốc">
+          <svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+        </button>
+        <button class="tool" id="btnLayer" title="Đổi lớp bản đồ">
+          <svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5z"/><path d="m2 13 10 5 10-5"/></svg>
+        </button>
+        <button class="tool" id="btnFull" title="Toàn màn hình">
+          <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+        </button>
+      </div>
+
+      <div class="legend" id="legend"></div>
+
+      <div class="tourbar" id="tourbar">
+        <button class="tool" id="tourPrev" title="Trước"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <button class="tour-play" id="tourPlay" title="Bắt đầu tour">
+          <svg class="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg class="i-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+          <span id="tourLabel">Tour</span>
+        </button>
+        <button class="tool" id="tourNext" title="Tiếp"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+        <div class="tour-info" id="tourInfo"></div>
+        <div class="tour-progress"><i id="tourProgress"></i></div>
+      </div>
+
+      <div class="toast" id="toast" role="status"></div>
+    </div>
+  </main>
+
+  <div class="loading" id="loading"><div class="spinner"></div><p>Đang tải dữ liệu…</p></div>
+
+  <script src="config.js"></script>
+  <script src="assets/provinces.js"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/markercluster/leaflet.markercluster.js"></script>
+  <script src="vendor/papaparse/papaparse.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
